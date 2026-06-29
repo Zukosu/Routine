@@ -1,0 +1,691 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="Routine">
+<meta name="theme-color" content="#ffffff">
+<title>Routine</title>
+<style>
+  :root {
+    --bg: #f7f6f3;
+    --surface: #ffffff;
+    --border: #e8e6e0;
+    --border-strong: #d0cec8;
+    --text: #1a1916;
+    --text-2: #6b6860;
+    --text-3: #a8a59f;
+    --radius: 10px;
+    --tab-h: 60px;
+    --safe-bottom: env(safe-area-inset-bottom, 0px);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #111110;
+      --surface: #1c1c1a;
+      --border: #2a2a27;
+      --border-strong: #3a3a36;
+      --text: #f0ede8;
+      --text-2: #9a9790;
+      --text-3: #5a5854;
+    }
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+  html, body { height: 100%; overflow: hidden; background: var(--bg); font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', sans-serif; color: var(--text); }
+  #app { display: flex; flex-direction: column; height: 100%; }
+  #scroll-area { flex: 1; overflow-y: auto; -webkit-overflow-scrolling: touch; padding-bottom: calc(var(--tab-h) + var(--safe-bottom) + 16px); }
+
+  /* TABS */
+  #tab-bar { display: flex; background: var(--surface); border-top: 0.5px solid var(--border); height: calc(var(--tab-h) + var(--safe-bottom)); padding-bottom: var(--safe-bottom); flex-shrink: 0; position: relative; z-index: 10; }
+  .tab-btn { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px; border: none; background: none; color: var(--text-3); font-size: 10px; font-weight: 500; cursor: pointer; padding-top: 8px; transition: color .15s; }
+  .tab-btn.active { color: var(--text); }
+  .tab-btn svg { width: 22px; height: 22px; stroke-width: 1.5; }
+
+  /* VIEW */
+  .view { display: none; padding: 0 16px; }
+  .view.active { display: block; }
+
+  /* PAGE HEADER */
+  .page-header { padding: 20px 0 4px; display: flex; align-items: center; justify-content: space-between; }
+  .page-title { font-size: 28px; font-weight: 600; letter-spacing: -0.5px; }
+  .nav-arrows { display: flex; gap: 4px; }
+  .nav-arrow { width: 32px; height: 32px; border-radius: 50%; border: 0.5px solid var(--border-strong); background: var(--surface); display: flex; align-items: center; justify-content: center; cursor: pointer; color: var(--text-2); }
+  .nav-arrow svg { width: 16px; height: 16px; stroke-width: 2; }
+
+  /* STATS ROW */
+  .stats-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin: 14px 0; }
+  .stat-card { background: var(--surface); border: 0.5px solid var(--border); border-radius: var(--radius); padding: 10px 12px; }
+  .stat-label { font-size: 10px; color: var(--text-3); font-weight: 500; text-transform: uppercase; letter-spacing: .05em; margin-bottom: 3px; }
+  .stat-val { font-size: 22px; font-weight: 600; letter-spacing: -0.5px; }
+
+  /* PROGRESS BAR */
+  .pbar-wrap { height: 6px; background: var(--border); border-radius: 3px; overflow: hidden; margin-bottom: 20px; }
+  .pbar-fill { height: 100%; border-radius: 3px; transition: width .4s ease, background .4s ease; }
+
+  /* SECTIONS */
+  .section-block { margin-bottom: 8px; }
+  .section-header { display: flex; align-items: center; justify-content: space-between; padding: 6px 2px; }
+  .section-label { font-size: 11px; font-weight: 600; color: var(--text-3); text-transform: uppercase; letter-spacing: .07em; }
+  .section-add-btn { width: 24px; height: 24px; border-radius: 50%; border: 0.5px solid var(--border-strong); background: none; display: flex; align-items: center; justify-content: center; cursor: pointer; color: var(--text-3); }
+  .section-add-btn svg { width: 12px; height: 12px; stroke-width: 2.5; }
+
+  /* TASK ROW */
+  .task-row { display: flex; align-items: center; gap: 12px; padding: 12px 14px; background: var(--surface); border: 0.5px solid var(--border); border-radius: var(--radius); margin-bottom: 6px; cursor: pointer; transition: background .1s; user-select: none; position: relative; }
+  .task-row.done { background: #f0f7e8; border-color: #c8dfa8; }
+  @media (prefers-color-scheme: dark) { .task-row.done { background: #1a2412; border-color: #2d4a1a; } }
+  .chk { width: 22px; height: 22px; border-radius: 50%; border: 1.5px solid var(--border-strong); flex-shrink: 0; display: flex; align-items: center; justify-content: center; transition: all .2s; }
+  .task-row.done .chk { background: #4a8a1a; border-color: #4a8a1a; }
+  .chk-inner { display: none; }
+  .task-row.done .chk-inner { display: block; }
+  .task-text { flex: 1; }
+  .task-name { font-size: 15px; color: var(--text); line-height: 1.3; transition: color .15s; }
+  .task-row.done .task-name { color: #4a8a1a; text-decoration: line-through; text-decoration-color: #7ab84a; }
+  @media (prefers-color-scheme: dark) { .task-row.done .task-name { color: #7ab84a; } }
+  .task-time { font-size: 11px; color: var(--text-3); margin-top: 1px; }
+  .task-actions { display: flex; gap: 2px; flex-shrink: 0; }
+  .task-edit-btn, .task-del-btn { width: 28px; height: 28px; border-radius: 6px; border: none; background: none; display: flex; align-items: center; justify-content: center; cursor: pointer; color: var(--text-3); }
+  .task-edit-btn:active { background: var(--border); }
+  .task-del-btn:active { background: #fde8e8; color: #c0392b; }
+  .task-edit-btn svg, .task-del-btn svg { width: 15px; height: 15px; stroke-width: 1.8; }
+
+  /* INLINE EDIT */
+  .inline-edit { background: var(--surface); border: 0.5px solid #4a8a1a; border-radius: var(--radius); padding: 10px 12px; margin-bottom: 6px; }
+  .inline-edit input { width: 100%; font-size: 14px; color: var(--text); background: none; border: none; outline: none; padding: 4px 0; border-bottom: 0.5px solid var(--border); margin-bottom: 6px; }
+  .inline-edit input:last-of-type { margin-bottom: 10px; }
+  .inline-edit-btns { display: flex; gap: 8px; justify-content: flex-end; }
+  .inline-edit-btns button { font-size: 13px; padding: 5px 14px; border-radius: 8px; cursor: pointer; border: 0.5px solid var(--border-strong); background: none; color: var(--text); }
+  .inline-edit-btns .save-btn { background: #4a8a1a; color: white; border-color: #4a8a1a; }
+
+  /* ADD SECTION */
+  .add-section-area { margin-top: 20px; border-top: 0.5px solid var(--border); padding-top: 16px; margin-bottom: 8px; }
+  .add-section-label { font-size: 11px; font-weight: 600; color: var(--text-3); text-transform: uppercase; letter-spacing: .07em; margin-bottom: 8px; }
+  .add-section-row { display: flex; gap: 8px; }
+  .add-section-row input { flex: 1; font-size: 14px; padding: 9px 12px; border-radius: var(--radius); border: 0.5px solid var(--border-strong); background: var(--surface); color: var(--text); outline: none; }
+  .add-section-row input:focus { border-color: #4a8a1a; }
+  .add-section-row button { font-size: 13px; padding: 9px 16px; border-radius: var(--radius); border: none; background: #4a8a1a; color: white; cursor: pointer; white-space: nowrap; }
+
+  /* SECTION RENAME */
+  .sec-rename-row { display: flex; align-items: center; gap: 8px; padding: 6px 2px; }
+  .sec-rename-row input { flex: 1; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .07em; color: var(--text-3); background: none; border: none; border-bottom: 1px solid #4a8a1a; outline: none; padding: 1px 2px; }
+  .sec-save-btn { font-size: 11px; padding: 3px 10px; border-radius: 6px; border: 0.5px solid var(--border-strong); background: none; color: var(--text); cursor: pointer; }
+  .sec-del-btn { font-size: 11px; padding: 3px 10px; border-radius: 6px; border: none; background: none; color: #c0392b; cursor: pointer; }
+
+  /* DIVIDER */
+  .divider { display: flex; align-items: center; gap: 12px; margin: 28px 0 20px; }
+  .divider-line { flex: 1; height: 0.5px; background: var(--border); }
+  .divider-label { font-size: 11px; font-weight: 600; color: var(--text-3); text-transform: uppercase; letter-spacing: .07em; white-space: nowrap; }
+
+  /* MIND DUMP */
+  .prompts-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
+  .prompts-sublabel { font-size: 11px; color: var(--text-3); font-weight: 500; }
+  .shuffle-btn { font-size: 12px; color: #4a8a1a; background: none; border: none; cursor: pointer; display: flex; align-items: center; gap: 4px; padding: 0; }
+  .shuffle-btn svg { width: 13px; height: 13px; stroke-width: 2; }
+  .prompts-row { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 12px; }
+  .prompt-chip { font-size: 12px; padding: 6px 12px; border-radius: 20px; border: 0.5px solid var(--border-strong); background: var(--surface); color: var(--text-2); cursor: pointer; transition: all .15s; }
+  .prompt-chip.active { background: #eef6e4; color: #3a7010; border-color: #9acc66; }
+  @media (prefers-color-scheme: dark) { .prompt-chip.active { background: #1a2e0e; color: #7ab84a; border-color: #3a5a1a; } }
+  .prompt-expanded { background: var(--surface); border: 0.5px solid var(--border); border-radius: var(--radius); padding: 12px 14px; margin-bottom: 12px; font-size: 13px; color: var(--text-2); line-height: 1.6; display: none; }
+  .prompt-expanded.show { display: block; }
+  .len-row { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
+  .len-badge { font-size: 11px; padding: 4px 10px; border-radius: 12px; font-weight: 500; white-space: nowrap; background: var(--border); color: var(--text-2); }
+  .len-badge.good { background: #eef6e4; color: #3a7010; }
+  .len-badge.warn { background: #fef3e2; color: #8a5a00; }
+  .len-badge.over { background: #fde8e8; color: #8a2020; }
+  @media (prefers-color-scheme: dark) {
+    .len-badge.good { background: #1a2e0e; color: #7ab84a; }
+    .len-badge.warn { background: #2a1e06; color: #c8962a; }
+    .len-badge.over { background: #2a0e0e; color: #c84a4a; }
+  }
+  .len-hint { font-size: 12px; color: var(--text-3); flex: 1; }
+  .dump-pbar-wrap { height: 3px; background: var(--border); border-radius: 2px; overflow: hidden; margin-bottom: 10px; }
+  .dump-pbar-fill { height: 100%; border-radius: 2px; transition: width .3s, background .3s; }
+  .dump-textarea { width: 100%; min-height: 160px; font-size: 15px; line-height: 1.75; padding: 14px; border-radius: var(--radius); border: 0.5px solid var(--border-strong); background: var(--surface); color: var(--text); resize: none; font-family: Georgia, 'Times New Roman', serif; outline: none; }
+  .dump-textarea:focus { border-color: #4a8a1a; }
+  .dump-meta-row { display: flex; align-items: center; justify-content: space-between; margin-top: 8px; }
+  .dump-wc { font-size: 12px; color: var(--text-3); }
+  .dump-wc span { color: var(--text-2); font-weight: 500; }
+  .dump-btns { display: flex; gap: 8px; }
+  .dump-btns button { font-size: 13px; padding: 7px 16px; border-radius: var(--radius); cursor: pointer; border: 0.5px solid var(--border-strong); background: none; color: var(--text); }
+  .dump-btns .dump-save-btn { background: #4a8a1a; color: white; border-color: #4a8a1a; }
+  .saved-dump-card { background: #f0f7e8; border: 0.5px solid #c8dfa8; border-radius: var(--radius); padding: 14px; margin-top: 4px; }
+  @media (prefers-color-scheme: dark) { .saved-dump-card { background: #1a2412; border-color: #2d4a1a; } }
+  .saved-dump-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px; }
+  .saved-dump-label { font-size: 11px; font-weight: 600; color: #4a8a1a; text-transform: uppercase; letter-spacing: .06em; }
+  .saved-dump-wc { font-size: 11px; color: #4a8a1a; opacity: .8; }
+  .saved-dump-prompt { font-size: 11px; color: #4a8a1a; opacity: .7; margin-bottom: 8px; }
+  .saved-dump-text { font-size: 13px; color: #3a5a18; line-height: 1.6; font-family: Georgia, serif; display: -webkit-box; -webkit-line-clamp: 4; -webkit-box-orient: vertical; overflow: hidden; }
+  @media (prefers-color-scheme: dark) { .saved-dump-text { color: #7ab84a; } }
+  .saved-dump-edit { font-size: 12px; color: #4a8a1a; background: none; border: none; cursor: pointer; padding: 6px 0 0; text-decoration: underline; display: block; }
+
+  /* WEEK VIEW */
+  .week-bar-row { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
+  .week-day-label { font-size: 12px; color: var(--text-2); width: 48px; flex-shrink: 0; }
+  .week-bar-track { flex: 1; height: 28px; background: var(--surface); border: 0.5px solid var(--border); border-radius: 8px; overflow: hidden; }
+  .week-bar-fill { height: 100%; border-radius: 8px; display: flex; align-items: center; padding-left: 10px; transition: width .4s, background .4s; }
+  .week-bar-pct { font-size: 11px; font-weight: 600; color: white; }
+  .week-dump-dot { width: 18px; height: 18px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; }
+  .week-dump-dot svg { width: 14px; height: 14px; stroke-width: 1.8; }
+  .week-task-count { font-size: 11px; color: var(--text-3); width: 36px; text-align: right; flex-shrink: 0; }
+
+  /* MONTH GRID */
+  .month-grid-header { display: grid; grid-template-columns: repeat(7, 1fr); gap: 3px; margin-bottom: 3px; }
+  .month-grid-header span { font-size: 10px; color: var(--text-3); text-align: center; font-weight: 500; }
+  .month-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 3px; }
+  .mcell { aspect-ratio: 1; border-radius: 6px; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 500; border: 0.5px solid var(--border); color: white; position: relative; }
+  .mcell.empty { border-color: transparent; background: transparent !important; }
+  .mcell.no-data { background: var(--surface) !important; color: var(--text-3); }
+  .mcell.today { outline: 2px solid var(--text); outline-offset: 1px; }
+  .mcell-dot { position: absolute; bottom: 2px; right: 2px; width: 4px; height: 4px; border-radius: 50%; background: white; opacity: .7; }
+
+  /* YEAR GRID */
+  .year-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-top: 4px; }
+  .yr-card { background: var(--surface); border: 0.5px solid var(--border); border-radius: var(--radius); padding: 12px; }
+  .yr-name { font-size: 11px; color: var(--text-3); font-weight: 600; text-transform: uppercase; letter-spacing: .06em; margin-bottom: 8px; }
+  .yr-bar-track { height: 8px; background: var(--border); border-radius: 4px; overflow: hidden; margin-bottom: 5px; }
+  .yr-bar-fill { height: 100%; border-radius: 4px; }
+  .yr-pct { font-size: 16px; font-weight: 600; }
+
+  /* SECTION RENAME INLINE */
+  .sec-header-wrap { position: relative; }
+</style>
+</head>
+<body>
+<div id="app">
+  <div id="scroll-area">
+    <div id="view-today" class="view active"></div>
+    <div id="view-week" class="view"></div>
+    <div id="view-month" class="view"></div>
+    <div id="view-year" class="view"></div>
+  </div>
+  <div id="tab-bar">
+    <button class="tab-btn active" onclick="switchTab('today')" id="tab-today">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>
+      Today
+    </button>
+    <button class="tab-btn" onclick="switchTab('week')" id="tab-week">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M3 6h18M3 12h18M3 18h12"/></svg>
+      Week
+    </button>
+    <button class="tab-btn" onclick="switchTab('month')" id="tab-month">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18M8 14h.01M12 14h.01M16 14h.01M8 18h.01M12 18h.01"/></svg>
+      Month
+    </button>
+    <button class="tab-btn" onclick="switchTab('year')" id="tab-year">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 3"/></svg>
+      Year
+    </button>
+  </div>
+</div>
+
+<script>
+const DEFAULT_SECTIONS = [
+  {id:"s1",title:"Spiritual & mindset start",tasks:[
+    {id:"t1",name:"Wake up on time, phone off",time:"5:00–5:30 AM"},
+    {id:"t2",name:"Tahajjud prayer",time:"5:00–5:30 AM"},
+    {id:"t3",name:"Daily affirmations & manifestation",time:"5:00–5:30 AM"},
+  ]},
+  {id:"s2",title:"Fajr prayer",tasks:[{id:"t4",name:"Fajr prayer on time",time:"5:30–6:00 AM"}]},
+  {id:"s3",title:"Grounding & screen-free focus",tasks:[
+    {id:"t5",name:"Phone off / airplane mode",time:"6:00–7:00 AM"},
+    {id:"t6",name:"Hydrate (start 3L goal)",time:"6:00–7:00 AM"},
+    {id:"t7",name:"Daily potassium tablet",time:"6:00–7:00 AM"},
+  ]},
+  {id:"s4",title:"Personal development",tasks:[
+    {id:"t8",name:"Deep work — build the business (30–60 min)",time:"7:00–8:30 AM"},
+    {id:"t9",name:"Journaling",time:"7:00–8:30 AM"},
+  ]},
+  {id:"s5",title:"Morning fuel",tasks:[{id:"t10",name:"High-protein breakfast (track 120g)",time:"8:30–9:00 AM"}]},
+  {id:"s6",title:"Mid-day tasks & Dhuhr",tasks:[
+    {id:"t11",name:"Stay active, move throughout morning",time:"9:00 AM–1:00 PM"},
+    {id:"t12",name:"Consistent water intake",time:"9:00 AM–1:00 PM"},
+    {id:"t13",name:"Dhuhr prayer",time:"1:00–1:30 PM"},
+  ]},
+  {id:"s7",title:"Afternoon tasks & Asr",tasks:[
+    {id:"t14",name:"High-protein intake & movement",time:"1:30–4:30 PM"},
+    {id:"t15",name:"Asr prayer",time:"4:30–5:00 PM"},
+  ]},
+  {id:"s8",title:"Physical training",tasks:[
+    {id:"t16",name:"Gym session (upper/lower split)",time:"5:00–6:30 PM"},
+    {id:"t17",name:"30 min cardio (on leg days)",time:"5:00–6:30 PM"},
+    {id:"t18",name:"Bar hang routine (3×1 min)",time:"5:00–6:30 PM"},
+  ]},
+  {id:"s9",title:"Maghrib & dinner",tasks:[
+    {id:"t19",name:"Maghrib prayer",time:"6:30–7:30 PM"},
+    {id:"t20",name:"High-protein dinner (lock in 120g)",time:"6:30–7:30 PM"},
+  ]},
+  {id:"s10",title:"Skill & structural mechanics",tasks:[
+    {id:"t21",name:"Jaw mechanics — hard chew 20 min",time:"7:30–8:30 PM"},
+    {id:"t22",name:"Neck curls (3×20)",time:"7:30–8:30 PM"},
+  ]},
+  {id:"s11",title:"Isha & nighttime routine",tasks:[
+    {id:"t23",name:"Isha prayer",time:"8:30–9:00 PM"},
+    {id:"t24",name:"Hot shower",time:"9:00–10:00 PM"},
+    {id:"t25",name:"Volufiline & moisturizer under eyes",time:"9:00–10:00 PM"},
+    {id:"t26",name:"Hair tonic to scalp & eyebrows",time:"9:00–10:00 PM"},
+    {id:"t27",name:"Scalp massage (2–5 min)",time:"9:00–10:00 PM"},
+  ]},
+  {id:"s12",title:"Digital detox & spiritual closure",tasks:[
+    {id:"t28",name:"Phone completely off",time:"10:00 PM"},
+    {id:"t29",name:"Tawbah prayer",time:"10:00–10:30 PM"},
+    {id:"t30",name:"Nighttime affirmations & manifestation",time:"10:00–10:30 PM"},
+  ]},
+];
+
+const ALL_PROMPTS = [
+  {label:"Today's energy",text:"How does your body and mind feel right now? What's your energy level, and what's behind it?"},
+  {label:"What's weighing on you",text:"What thought or worry has been sitting in the back of your mind today? Get it all out without filtering."},
+  {label:"Wins & gratitude",text:"What went well today? What are you genuinely grateful for, even if it's small?"},
+  {label:"What needs to change",text:"Is there anything — a habit, a relationship, a mindset — that you know needs to shift?"},
+  {label:"Future self",text:"Imagine yourself 12 months from now living exactly the life you want. Describe what a normal day looks like."},
+  {label:"Unfinished business",text:"What have you been putting off? What conversation, decision, or task are you avoiding and why?"},
+  {label:"Lesson of late",text:"What lesson has life been teaching you lately? Has it shown up more than once?"},
+  {label:"Fear check",text:"What is something you want but are afraid to pursue? What's the actual worst-case scenario?"},
+  {label:"People on my mind",text:"Who have you been thinking about lately? What do you want to say to them that you haven't said?"},
+  {label:"Brain drain",text:"Write everything currently in your head — tasks, worries, ideas, memories, random thoughts. Empty the RAM."},
+  {label:"Tomorrow's intention",text:"What do you need to focus on tomorrow? What would make it feel like a win?"},
+  {label:"Proud of",text:"Describe something you've done recently — big or small — that you're genuinely proud of. Why does it matter?"},
+];
+
+let uid = 300;
+function gid() { return 'x' + (uid++); }
+
+function loadSections() {
+  try { const s = JSON.parse(localStorage.getItem('routine_sections')); if (s && s.length) return s; } catch {}
+  return JSON.parse(JSON.stringify(DEFAULT_SECTIONS));
+}
+let sections = loadSections();
+function saveSections() { try { localStorage.setItem('routine_sections', JSON.stringify(sections)); } catch {} }
+
+let checks = {};
+try { checks = JSON.parse(localStorage.getItem('routine_checks') || '{}'); } catch {}
+function saveChecks() { try { localStorage.setItem('routine_checks', JSON.stringify(checks)); } catch {} }
+
+let dumps = {};
+try { dumps = JSON.parse(localStorage.getItem('routine_dumps') || '{}'); } catch {}
+function saveDumps() { try { localStorage.setItem('routine_dumps', JSON.stringify(dumps)); } catch {} }
+
+function dk(d) {
+  return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
+}
+function allIds() { return sections.flatMap(s => s.tasks.map(t => t.id)); }
+function getDayRatio(d) {
+  const ids = allIds(); if (!ids.length) return {done:0,total:0,ratio:0};
+  const c = checks[dk(d)] || {};
+  const done = ids.filter(id => c[id]).length;
+  return {done, total: ids.length, ratio: done / ids.length};
+}
+function hasData(d) { const ids = allIds(); const c = checks[dk(d)] || {}; return ids.some(id => c[id]); }
+function setCheck(d, id, v) { const k = dk(d); if (!checks[k]) checks[k] = {}; checks[k][id] = v; saveChecks(); }
+function getCheck(d, id) { return !!((checks[dk(d)] || {})[id]); }
+function hsl(r) { return `hsl(${Math.round(r * 120)}, 65%, 38%)`; }
+function wc(text) { return text.trim() === '' ? 0 : text.trim().split(/\s+/).length; }
+
+let currentDay = new Date(); currentDay.setHours(0,0,0,0);
+let viewMonth = new Date(currentDay.getFullYear(), currentDay.getMonth(), 1);
+let viewYear = currentDay.getFullYear();
+let currentTab = 'today';
+let editingTask = null;
+let editingSection = null;
+let shownPrompts = [];
+let activePromptIdx = null;
+let dumpEditing = false;
+
+function shuffleArr(a) { return [...a].sort(() => Math.random() - .5); }
+function reshufflePrompts() { shownPrompts = shuffleArr(ALL_PROMPTS).slice(0, 6); activePromptIdx = null; }
+reshufflePrompts();
+
+function switchTab(t) {
+  currentTab = t;
+  editingTask = null; editingSection = null;
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById('tab-' + t).classList.add('active');
+  document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+  document.getElementById('view-' + t).classList.add('active');
+  ({today: renderToday, week: renderWeek, month: renderMonth, year: renderYear})[t]();
+}
+
+function renderToday() {
+  const d = currentDay;
+  const today = new Date(); today.setHours(0,0,0,0);
+  const isToday = dk(d) === dk(today);
+  const sc = getDayRatio(d);
+  const pct = sc.total ? Math.round(sc.ratio * 100) : 0;
+  const color = sc.total ? hsl(sc.ratio) : '#aaa';
+  const el = document.getElementById('view-today');
+  el.innerHTML = '';
+
+  // Header
+  const hdr = document.createElement('div');
+  hdr.className = 'page-header';
+  const title = document.createElement('div');
+  title.className = 'page-title';
+  title.textContent = isToday ? 'Today' : d.toLocaleDateString('en-GB', {weekday:'short', day:'numeric', month:'short'});
+  const nav = document.createElement('div');
+  nav.className = 'nav-arrows';
+  nav.innerHTML = `<div class="nav-arrow" onclick="changeDay(-1)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M15 18l-6-6 6-6"/></svg></div>
+    <div class="nav-arrow" onclick="changeDay(1)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M9 18l6-6-6-6"/></svg></div>`;
+  hdr.appendChild(title); hdr.appendChild(nav);
+  el.appendChild(hdr);
+
+  // Stats
+  const stats = document.createElement('div');
+  stats.className = 'stats-row';
+  stats.innerHTML = `<div class="stat-card"><div class="stat-label">Done</div><div class="stat-val" style="color:${color}">${sc.done}</div></div>
+    <div class="stat-card"><div class="stat-label">Total</div><div class="stat-val">${sc.total}</div></div>
+    <div class="stat-card"><div class="stat-label">Score</div><div class="stat-val" style="color:${color}">${sc.total ? pct + '%' : '–'}</div></div>`;
+  el.appendChild(stats);
+
+  // Progress bar
+  const pb = document.createElement('div'); pb.className = 'pbar-wrap';
+  pb.innerHTML = `<div class="pbar-fill" style="width:${pct}%;background:${color}"></div>`;
+  el.appendChild(pb);
+
+  // Sections
+  sections.forEach(sec => {
+    const secEl = document.createElement('div'); secEl.className = 'section-block';
+
+    // Section header
+    const secHdr = document.createElement('div');
+    if (editingSection === sec.id) {
+      secHdr.className = 'sec-rename-row';
+      const inp = document.createElement('input'); inp.value = sec.title;
+      inp.onclick = e => e.stopPropagation();
+      inp.onkeydown = e => { if (e.key === 'Enter') saveSectionName(sec, inp.value); if (e.key === 'Escape') { editingSection = null; renderToday(); } };
+      const sb = document.createElement('button'); sb.className = 'sec-save-btn'; sb.textContent = 'Save';
+      sb.onclick = () => saveSectionName(sec, inp.value);
+      const db = document.createElement('button'); db.className = 'sec-del-btn'; db.textContent = 'Delete';
+      db.onclick = () => { if (sections.length <= 1) return; sections = sections.filter(s => s.id !== sec.id); saveSections(); editingSection = null; renderToday(); };
+      secHdr.appendChild(inp); secHdr.appendChild(sb); secHdr.appendChild(db);
+      setTimeout(() => inp.focus(), 0);
+    } else {
+      secHdr.className = 'section-header';
+      const lbl = document.createElement('div'); lbl.className = 'section-label'; lbl.textContent = sec.title;
+      lbl.style.cursor = 'pointer'; lbl.onclick = () => { editingSection = sec.id; editingTask = null; renderToday(); };
+      const ab = document.createElement('button'); ab.className = 'section-add-btn';
+      ab.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M12 5v14M5 12h14"/></svg>`;
+      ab.onclick = () => { editingTask = {mode:'add', sectionId: sec.id}; editingSection = null; renderToday(); };
+      secHdr.appendChild(lbl); secHdr.appendChild(ab);
+    }
+    secEl.appendChild(secHdr);
+
+    sec.tasks.forEach(task => {
+      if (editingTask && editingTask.mode === 'edit' && editingTask.taskId === task.id) {
+        secEl.appendChild(buildEditRow(task, sec.id, 'edit')); return;
+      }
+      const done = getCheck(d, task.id);
+      const row = document.createElement('div'); row.className = 'task-row' + (done ? ' done' : '');
+      row.innerHTML = `<div class="chk"><svg class="chk-inner" width="12" height="12" viewBox="0 0 12 12" fill="none"><polyline points="2,6 5,9 10,3" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+        <div class="task-text"><div class="task-name">${task.name}</div>${task.time ? `<div class="task-time">${task.time}</div>` : ''}</div>
+        <div class="task-actions">
+          <button class="task-edit-btn" onclick="startEditTask('${task.id}','${sec.id}',event)" aria-label="Edit"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg></button>
+          <button class="task-del-btn" onclick="deleteTask('${task.id}','${sec.id}',event)" aria-label="Delete"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4h6v2"/></svg></button>
+        </div>`;
+      row.querySelector('.chk').onclick = e => { e.stopPropagation(); setCheck(d, task.id, !done); renderToday(); };
+      row.querySelector('.task-text').onclick = () => { setCheck(d, task.id, !done); renderToday(); };
+      secEl.appendChild(row);
+    });
+
+    if (editingTask && editingTask.mode === 'add' && editingTask.sectionId === sec.id) secEl.appendChild(buildEditRow(null, sec.id, 'add'));
+    el.appendChild(secEl);
+  });
+
+  // Add section
+  const addSec = document.createElement('div'); addSec.className = 'add-section-area';
+  addSec.innerHTML = `<div class="add-section-label">Add section</div>
+    <div class="add-section-row"><input id="new-sec-inp" placeholder="Section name" /><button onclick="addSection()">Add</button></div>`;
+  el.appendChild(addSec);
+  document.getElementById('new-sec-inp').onkeydown = e => { if (e.key === 'Enter') addSection(); };
+
+  // Mind dump
+  el.appendChild(buildMindDump(d));
+}
+
+function buildMindDump(d) {
+  const wrap = document.createElement('div');
+  const savedDump = dumps[dk(d)];
+
+  const divEl = document.createElement('div'); divEl.className = 'divider';
+  divEl.innerHTML = `<div class="divider-line"></div><div class="divider-label">Mind dump</div><div class="divider-line"></div>`;
+  wrap.appendChild(divEl);
+
+  if (savedDump && !dumpEditing) {
+    const card = document.createElement('div'); card.className = 'saved-dump-card';
+    card.innerHTML = `<div class="saved-dump-header"><span class="saved-dump-label">Written</span><span class="saved-dump-wc">${savedDump.wc} words</span></div>
+      ${savedDump.prompt ? `<div class="saved-dump-prompt">${savedDump.prompt}</div>` : ''}
+      <div class="saved-dump-text">${savedDump.text}</div>
+      <button class="saved-dump-edit" onclick="editDump()">Edit or rewrite</button>`;
+    wrap.appendChild(card);
+    return wrap;
+  }
+
+  // Prompts
+  const ph = document.createElement('div'); ph.className = 'prompts-header';
+  ph.innerHTML = `<span class="prompts-sublabel">Pick a prompt — or just write</span>
+    <button class="shuffle-btn" onclick="doShuffle()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M16 3h5v5M4 20L21 3"/><path d="M21 16v5h-5"/><path d="M15 15l6 6"/><path d="M4 4l5 5"/></svg> Shuffle</button>`;
+  wrap.appendChild(ph);
+
+  const pr = document.createElement('div'); pr.className = 'prompts-row';
+  shownPrompts.forEach((p, i) => {
+    const chip = document.createElement('button'); chip.className = 'prompt-chip' + (activePromptIdx === i ? ' active' : '');
+    chip.textContent = p.label; chip.onclick = () => selectPrompt(i);
+    pr.appendChild(chip);
+  });
+  wrap.appendChild(pr);
+
+  const pe = document.createElement('div'); pe.className = 'prompt-expanded' + (activePromptIdx !== null ? ' show' : ''); pe.id = 'prompt-exp';
+  if (activePromptIdx !== null) pe.textContent = shownPrompts[activePromptIdx].text;
+  wrap.appendChild(pe);
+
+  const lr = document.createElement('div'); lr.className = 'len-row';
+  lr.innerHTML = `<div class="len-badge" id="len-badge">Aim: 150–300 words</div><div class="len-hint" id="len-hint">A focused 5–10 min write.</div>`;
+  wrap.appendChild(lr);
+
+  const dpb = document.createElement('div'); dpb.className = 'dump-pbar-wrap';
+  dpb.innerHTML = `<div class="dump-pbar-fill" id="dump-pb-fill"></div>`;
+  wrap.appendChild(dpb);
+
+  const ta = document.createElement('textarea'); ta.className = 'dump-textarea'; ta.id = 'dump-ta';
+  ta.placeholder = activePromptIdx !== null ? shownPrompts[activePromptIdx].text : "What's on your mind? No filter, no judgment.";
+  ta.value = savedDump ? savedDump.text : '';
+  ta.oninput = updateDumpMeta;
+  wrap.appendChild(ta);
+
+  const meta = document.createElement('div'); meta.className = 'dump-meta-row';
+  meta.innerHTML = `<div class="dump-wc">Words: <span id="dump-wc">0</span></div>
+    <div class="dump-btns"><button onclick="clearDump()">Clear</button><button class="dump-save-btn" onclick="saveDump()">Save</button></div>`;
+  wrap.appendChild(meta);
+
+  setTimeout(updateDumpMeta, 0);
+  return wrap;
+}
+
+const TARGET_LOW = 150, TARGET_HIGH = 300, WARN_HIGH = 500;
+function updateDumpMeta() {
+  const ta = document.getElementById('dump-ta'); if (!ta) return;
+  const words = wc(ta.value);
+  const wcEl = document.getElementById('dump-wc'); if (wcEl) wcEl.textContent = words;
+  const badge = document.getElementById('len-badge');
+  const hint = document.getElementById('len-hint');
+  const fill = document.getElementById('dump-pb-fill');
+  if (!badge || !hint || !fill) return;
+  const pct = Math.min(100, Math.round(words / TARGET_HIGH * 100));
+  fill.style.width = pct + '%';
+  if (words === 0) { fill.style.background = '#ccc'; badge.className = 'len-badge'; badge.textContent = 'Aim: 150–300 words'; hint.textContent = 'A focused 5–10 min write.'; }
+  else if (words < TARGET_LOW) { fill.style.background = 'hsl(30,65%,42%)'; badge.className = 'len-badge warn'; badge.textContent = `${TARGET_LOW - words} words to go`; hint.textContent = 'Keep going — warming up.'; }
+  else if (words <= TARGET_HIGH) { fill.style.background = 'hsl(100,65%,38%)'; badge.className = 'len-badge good'; badge.textContent = 'Sweet spot ✓'; hint.textContent = 'Wrap up when it feels complete.'; }
+  else if (words <= WARN_HIGH) { fill.style.background = 'hsl(45,65%,38%)'; badge.className = 'len-badge warn'; badge.textContent = `${words} words — going long`; hint.textContent = 'Consider wrapping up.'; }
+  else { fill.style.background = 'hsl(0,65%,38%)'; badge.className = 'len-badge over'; badge.textContent = `${words} words — time to stop`; hint.textContent = 'Save it and let it go.'; }
+}
+
+function selectPrompt(i) {
+  activePromptIdx = activePromptIdx === i ? null : i;
+  document.querySelectorAll('.prompt-chip').forEach((c, idx) => c.classList.toggle('active', idx === activePromptIdx));
+  const pe = document.getElementById('prompt-exp');
+  const ta = document.getElementById('dump-ta');
+  if (pe) { if (activePromptIdx !== null) { pe.textContent = shownPrompts[activePromptIdx].text; pe.classList.add('show'); } else { pe.classList.remove('show'); } }
+  if (ta && !ta.value) ta.placeholder = activePromptIdx !== null ? shownPrompts[activePromptIdx].text : "What's on your mind? No filter, no judgment.";
+}
+function doShuffle() { reshufflePrompts(); renderToday(); }
+function saveDump() {
+  const ta = document.getElementById('dump-ta'); if (!ta) return;
+  const text = ta.value.trim(); if (!text) return;
+  const words = wc(text);
+  const prompt = activePromptIdx !== null ? shownPrompts[activePromptIdx].label : null;
+  dumps[dk(currentDay)] = {text, wc: words, prompt, saved: new Date().toISOString()};
+  saveDumps(); dumpEditing = false; activePromptIdx = null; renderToday();
+}
+function clearDump() { const ta = document.getElementById('dump-ta'); if (ta) { ta.value = ''; updateDumpMeta(); } }
+function editDump() { dumpEditing = true; renderToday(); setTimeout(() => { const ta = document.getElementById('dump-ta'); if (ta) { ta.focus(); ta.setSelectionRange(ta.value.length, ta.value.length); } }, 50); }
+
+function buildEditRow(task, secId, mode) {
+  const wrap = document.createElement('div'); wrap.className = 'inline-edit'; wrap.onclick = e => e.stopPropagation();
+  const ni = document.createElement('input'); ni.placeholder = 'Task name'; ni.value = task ? task.name : '';
+  const ti = document.createElement('input'); ti.placeholder = 'Time (optional)'; ti.value = task ? (task.time || '') : '';
+  const btns = document.createElement('div'); btns.className = 'inline-edit-btns';
+  const cb = document.createElement('button'); cb.textContent = 'Cancel'; cb.onclick = () => { editingTask = null; renderToday(); };
+  const sb = document.createElement('button'); sb.textContent = 'Save'; sb.className = 'save-btn';
+  sb.onclick = () => {
+    const name = ni.value.trim(); if (!name) return;
+    if (mode === 'add') { const sec = sections.find(s => s.id === secId); if (sec) sec.tasks.push({id: gid(), name, time: ti.value.trim()}); }
+    else { for (const sec of sections) { const t = sec.tasks.find(t => t.id === task.id); if (t) { t.name = name; t.time = ti.value.trim(); break; } } }
+    saveSections(); editingTask = null; renderToday();
+  };
+  btns.appendChild(cb); btns.appendChild(sb);
+  wrap.appendChild(ni); wrap.appendChild(ti); wrap.appendChild(btns);
+  ni.onkeydown = e => { if (e.key === 'Enter') sb.click(); if (e.key === 'Escape') { editingTask = null; renderToday(); } };
+  ti.onkeydown = e => { if (e.key === 'Enter') sb.click(); if (e.key === 'Escape') { editingTask = null; renderToday(); } };
+  setTimeout(() => ni.focus(), 0);
+  return wrap;
+}
+
+function saveSectionName(sec, val) { sec.title = val.trim() || sec.title; saveSections(); editingSection = null; renderToday(); }
+function startEditTask(id, secId, e) { e.stopPropagation(); editingTask = {mode:'edit', taskId: id, sectionId: secId}; editingSection = null; renderToday(); }
+function deleteTask(id, secId, e) { e.stopPropagation(); const sec = sections.find(s => s.id === secId); if (sec) sec.tasks = sec.tasks.filter(t => t.id !== id); saveSections(); renderToday(); }
+function addSection() { const inp = document.getElementById('new-sec-inp'); const t = inp.value.trim(); if (!t) return; sections.push({id: gid(), title: t, tasks: []}); saveSections(); inp.value = ''; renderToday(); }
+function changeDay(n) { currentDay = new Date(currentDay); currentDay.setDate(currentDay.getDate() + n); dumpEditing = false; activePromptIdx = null; renderToday(); }
+
+function renderWeek() {
+  const today = new Date(); today.setHours(0,0,0,0);
+  const dow = today.getDay(); const monday = new Date(today); monday.setDate(today.getDate() - (dow === 0 ? 6 : dow - 1));
+  const dayNames = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
+  const days = Array.from({length:7}, (_,i) => { const d = new Date(monday); d.setDate(monday.getDate() + i); return d; });
+  let td = 0, tt = 0, dt = 0;
+  days.forEach(d => { if (hasData(d)) { const r = getDayRatio(d); td += r.done; tt += r.total; dt++; } });
+  const wr = tt > 0 ? td / tt : 0;
+  const wColor = dt ? hsl(wr) : '#aaa';
+  const el = document.getElementById('view-week');
+
+  let html = `<div class="page-header"><div class="page-title">This week</div></div>
+    <div class="stats-row">
+      <div class="stat-card"><div class="stat-label">Average</div><div class="stat-val" style="color:${wColor}">${dt ? Math.round(wr*100)+'%' : '–'}</div></div>
+      <div class="stat-card"><div class="stat-label">Days done</div><div class="stat-val">${dt} / 7</div></div>
+      <div class="stat-card"><div class="stat-label">Dumps</div><div class="stat-val">${days.filter(d => dumps[dk(d)]).length} / 7</div></div>
+    </div>`;
+
+  days.forEach((d, i) => {
+    const isToday = dk(d) === dk(today);
+    const hasDat = hasData(d);
+    const isFuture = d > today;
+    const r = getDayRatio(d);
+    const pct = Math.round(r.ratio * 100);
+    const color = hasDat && !isFuture ? hsl(r.ratio) : null;
+    const hasDump = !!dumps[dk(d)];
+    html += `<div class="week-bar-row">
+      <div class="week-day-label" style="font-weight:${isToday?'600':'400'}">${dayNames[i]} ${d.getDate()}</div>
+      <div class="week-bar-track">
+        ${color ? `<div class="week-bar-fill" style="width:${pct}%;background:${color}"><span class="week-bar-pct">${pct}%</span></div>` : ''}
+      </div>
+      <div class="week-dump-dot" style="color:${hasDump?'#4a8a1a':'var(--border-strong)'}">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 013 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
+      </div>
+      <div class="week-task-count">${hasDat && !isFuture ? r.done+'/'+r.total : '–'}</div>
+    </div>`;
+  });
+  el.innerHTML = html;
+}
+
+function renderMonth() {
+  const today = new Date(); today.setHours(0,0,0,0);
+  const year = viewMonth.getFullYear(), month = viewMonth.getMonth();
+  const lastDay = new Date(year, month+1, 0).getDate();
+  let sumR = 0, cnt = 0, bestR = 0, bestD = null;
+  for (let i = 1; i <= lastDay; i++) { const d = new Date(year, month, i); if (hasData(d) && d <= today) { const r = getDayRatio(d); sumR += r.ratio; cnt++; if (r.ratio > bestR) { bestR = r.ratio; bestD = i; } } }
+  const avg = cnt ? sumR / cnt : 0;
+  const el = document.getElementById('view-month');
+
+  let html = `<div class="page-header">
+    <div class="page-title">${viewMonth.toLocaleDateString('en-GB',{month:'long'})}</div>
+    <div class="nav-arrows">
+      <div class="nav-arrow" onclick="chMonth(-1)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 18l-6-6 6-6"/></svg></div>
+      <div class="nav-arrow" onclick="chMonth(1)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 18l6-6-6-6"/></svg></div>
+    </div>
+  </div>
+  <div class="stats-row">
+    <div class="stat-card"><div class="stat-label">Average</div><div class="stat-val" style="color:${cnt?hsl(avg):'#aaa'}">${cnt?Math.round(avg*100)+'%':'–'}</div></div>
+    <div class="stat-card"><div class="stat-label">Tracked</div><div class="stat-val">${cnt} / ${lastDay}</div></div>
+    <div class="stat-card"><div class="stat-label">Best day</div><div class="stat-val">${bestD ? bestD+'—'+Math.round(bestR*100)+'%' : '–'}</div></div>
+  </div>
+  <div class="month-grid-header">${['M','T','W','T','F','S','S'].map(d=>`<span>${d}</span>`).join('')}</div>
+  <div class="month-grid">`;
+
+  let firstDow = new Date(year, month, 1).getDay(); if (firstDow === 0) firstDow = 7;
+  for (let i = 1; i < firstDow; i++) html += `<div class="mcell empty"></div>`;
+  for (let day = 1; day <= lastDay; day++) {
+    const d = new Date(year, month, day);
+    const isToday = dk(d) === dk(today);
+    const isFuture = d > today;
+    const hasDat = hasData(d);
+    const r = getDayRatio(d);
+    const hasDump = !!dumps[dk(d)];
+    const color = hasDat && !isFuture ? hsl(r.ratio) : null;
+    html += `<div class="mcell${hasDat&&!isFuture?'':' no-data'}${isToday?' today':''}" style="${color?`background:${color};border-color:${color}`:''}" title="${hasDat&&!isFuture?Math.round(r.ratio*100)+'%':''}">
+      ${day}${hasDump && color ? '<div class="mcell-dot"></div>' : ''}
+    </div>`;
+  }
+  html += `</div>`;
+  el.innerHTML = html;
+}
+function chMonth(n) { viewMonth = new Date(viewMonth.getFullYear(), viewMonth.getMonth()+n, 1); renderMonth(); }
+
+function renderYear() {
+  const today = new Date(); today.setHours(0,0,0,0);
+  const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  let yearSum = 0, trackedM = 0, totalDays = 0;
+  let cardsHtml = '';
+  for (let m = 0; m < 12; m++) {
+    const last = new Date(viewYear, m+1, 0).getDate();
+    let s = 0, c = 0;
+    for (let day = 1; day <= last; day++) { const d = new Date(viewYear, m, day); if (d <= today && hasData(d)) { s += getDayRatio(d).ratio; c++; totalDays++; } }
+    const avg = c ? s / c : null;
+    if (avg !== null) { yearSum += avg; trackedM++; }
+    const color = avg !== null ? hsl(avg) : null;
+    cardsHtml += `<div class="yr-card">
+      <div class="yr-name">${months[m]}</div>
+      <div class="yr-bar-track"><div class="yr-bar-fill" style="${color?`width:100%;background:${color}`:'width:0%'}"></div></div>
+      <div class="yr-pct" style="${color?`color:${color}`:'color:var(--text-3)'}">${avg !== null ? Math.round(avg*100)+'%' : '–'}</div>
+    </div>`;
+  }
+  const ya = trackedM ? Math.round((yearSum / trackedM) * 100) : null;
+  const el = document.getElementById('view-year');
+  el.innerHTML = `<div class="page-header">
+    <div class="page-title">${viewYear}</div>
+    <div class="nav-arrows">
+      <div class="nav-arrow" onclick="chYear(-1)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 18l-6-6 6-6"/></svg></div>
+      <div class="nav-arrow" onclick="chYear(1)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 18l6-6-6-6"/></svg></div>
+    </div>
+  </div>
+  <div class="stats-row">
+    <div class="stat-card"><div class="stat-label">Year avg</div><div class="stat-val" style="color:${ya?hsl(ya/100):'#aaa'}">${ya?ya+'%':'–'}</div></div>
+    <div class="stat-card"><div class="stat-label">Months</div><div class="stat-val">${trackedM} / 12</div></div>
+    <div class="stat-card"><div class="stat-label">Days logged</div><div class="stat-val">${totalDays}</div></div>
+  </div>
+  <div class="year-grid">${cardsHtml}</div>`;
+}
+function chYear(n) { viewYear += n; renderYear(); }
+
+renderToday();
+</script>
+</body>
+</html>
