@@ -50,9 +50,16 @@
   /* PAGE HEADER */
   .page-header { padding: 20px 0 4px; display: flex; align-items: center; justify-content: space-between; }
   .page-title { font-size: 28px; font-weight: 600; letter-spacing: -0.5px; }
+  .page-title.sub { font-size: 20px; }
   .nav-arrows { display: flex; gap: 4px; }
   .nav-arrow { width: 32px; height: 32px; border-radius: 50%; border: 0.5px solid var(--border-strong); background: var(--surface); display: flex; align-items: center; justify-content: center; cursor: pointer; color: var(--text-2); }
   .nav-arrow svg { width: 16px; height: 16px; stroke-width: 2; }
+
+  /* PAST DAY NOTICE */
+  .past-notice { font-size: 11px; color: var(--text-3); background: var(--surface); border: 0.5px solid var(--border); border-radius: var(--radius); padding: 8px 12px; margin-bottom: 12px; line-height: 1.5; }
+
+  /* HINT */
+  .tap-hint { font-size: 11px; color: var(--text-3); margin-bottom: 10px; }
 
   /* STATS ROW */
   .stats-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin: 14px 0; }
@@ -160,7 +167,9 @@
   .saved-dump-edit { font-size: 12px; color: #4a8a1a; background: none; border: none; cursor: pointer; padding: 6px 0 0; text-decoration: underline; display: block; }
 
   /* WEEK VIEW */
-  .week-bar-row { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
+  .week-bar-row { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; cursor: pointer; border-radius: var(--radius); padding: 2px; transition: background .1s; }
+  .week-bar-row:active { background: var(--border); }
+  .week-bar-row > * { pointer-events: none; }
   .week-day-label { font-size: 12px; color: var(--text-2); width: 48px; flex-shrink: 0; }
   .week-bar-track { flex: 1; height: 28px; background: var(--surface); border: 0.5px solid var(--border); border-radius: 8px; overflow: hidden; }
   .week-bar-fill { height: 100%; border-radius: 8px; display: flex; align-items: center; padding-left: 10px; transition: width .4s, background .4s; }
@@ -173,22 +182,23 @@
   .month-grid-header { display: grid; grid-template-columns: repeat(7, 1fr); gap: 3px; margin-bottom: 3px; }
   .month-grid-header span { font-size: 10px; color: var(--text-3); text-align: center; font-weight: 500; }
   .month-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 3px; }
-  .mcell { aspect-ratio: 1; border-radius: 6px; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 500; border: 0.5px solid var(--border); color: white; position: relative; }
-  .mcell.empty { border-color: transparent; background: transparent !important; }
+  .mcell { aspect-ratio: 1; border-radius: 6px; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 500; border: 0.5px solid var(--border); color: white; position: relative; cursor: pointer; }
+  .mcell > * { pointer-events: none; }
+  .mcell:active { opacity: .7; }
+  .mcell.empty { border-color: transparent; background: transparent !important; cursor: default; }
   .mcell.no-data { background: var(--surface) !important; color: var(--text-3); }
   .mcell.today { outline: 2px solid var(--text); outline-offset: 1px; }
   .mcell-dot { position: absolute; bottom: 2px; right: 2px; width: 4px; height: 4px; border-radius: 50%; background: white; opacity: .7; }
 
   /* YEAR GRID */
   .year-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-top: 4px; }
-  .yr-card { background: var(--surface); border: 0.5px solid var(--border); border-radius: var(--radius); padding: 12px; }
+  .yr-card { background: var(--surface); border: 0.5px solid var(--border); border-radius: var(--radius); padding: 12px; cursor: pointer; transition: background .1s; }
+  .yr-card:active { background: var(--border); }
+  .yr-card > * { pointer-events: none; }
   .yr-name { font-size: 11px; color: var(--text-3); font-weight: 600; text-transform: uppercase; letter-spacing: .06em; margin-bottom: 8px; }
   .yr-bar-track { height: 8px; background: var(--border); border-radius: 4px; overflow: hidden; margin-bottom: 5px; }
   .yr-bar-fill { height: 100%; border-radius: 4px; }
   .yr-pct { font-size: 16px; font-weight: 600; }
-
-  /* SECTION RENAME INLINE */
-  .sec-header-wrap { position: relative; }
 </style>
 </head>
 <body>
@@ -288,12 +298,14 @@ const ALL_PROMPTS = [
   {label:"Proud of",text:"Describe something you've done recently — big or small — that you're genuinely proud of. Why does it matter?"},
 ];
 
-let uid = 300;
+let uid = Date.now() % 100000;
 function gid() { return 'x' + (uid++); }
+function clone(o) { return JSON.parse(JSON.stringify(o)); }
 
+/* ---------- STORAGE ---------- */
 function loadSections() {
   try { const s = JSON.parse(localStorage.getItem('routine_sections')); if (s && s.length) return s; } catch {}
-  return JSON.parse(JSON.stringify(DEFAULT_SECTIONS));
+  return clone(DEFAULT_SECTIONS);
 }
 let sections = loadSections();
 function saveSections() { try { localStorage.setItem('routine_sections', JSON.stringify(sections)); } catch {} }
@@ -306,23 +318,62 @@ let dumps = {};
 try { dumps = JSON.parse(localStorage.getItem('routine_dumps') || '{}'); } catch {}
 function saveDumps() { try { localStorage.setItem('routine_dumps', JSON.stringify(dumps)); } catch {} }
 
+let snapshots = {};
+try { snapshots = JSON.parse(localStorage.getItem('routine_snapshots') || '{}'); } catch {}
+function saveSnapshots() { try { localStorage.setItem('routine_snapshots', JSON.stringify(snapshots)); } catch {} }
+
 function dk(d) {
   return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
 }
-function allIds() { return sections.flatMap(s => s.tasks.map(t => t.id)); }
+function todayKey() { const t = new Date(); t.setHours(0,0,0,0); return dk(t); }
+function isPastDay(d) { return dk(d) < todayKey(); }
+
+function sectionsFor(d) {
+  const k = dk(d);
+  if (k < todayKey() && snapshots[k]) return snapshots[k];
+  return sections;
+}
+function idsFor(d) { return sectionsFor(d).flatMap(s => s.tasks.map(t => t.id)); }
+
+function syncTodaySnapshot() {
+  const k = todayKey();
+  snapshots[k] = clone(sections);
+  for (const key of Object.keys(snapshots)) {
+    if (key > k) snapshots[key] = clone(sections);
+  }
+  saveSnapshots();
+}
+(function migrate() {
+  const tk = todayKey();
+  let changed = false;
+  for (const key of Object.keys(checks)) {
+    if (key < tk && !snapshots[key]) { snapshots[key] = clone(sections); changed = true; }
+  }
+  if (changed) saveSnapshots();
+  syncTodaySnapshot();
+})();
+
 function getDayRatio(d) {
-  const ids = allIds(); if (!ids.length) return {done:0,total:0,ratio:0};
+  const ids = idsFor(d); if (!ids.length) return {done:0,total:0,ratio:0};
   const c = checks[dk(d)] || {};
   const done = ids.filter(id => c[id]).length;
   return {done, total: ids.length, ratio: done / ids.length};
 }
-function hasData(d) { const ids = allIds(); const c = checks[dk(d)] || {}; return ids.some(id => c[id]); }
-function setCheck(d, id, v) { const k = dk(d); if (!checks[k]) checks[k] = {}; checks[k][id] = v; saveChecks(); }
+function hasData(d) { const ids = idsFor(d); const c = checks[dk(d)] || {}; return ids.some(id => c[id]); }
+function setCheck(d, id, v) {
+  const k = dk(d);
+  if (!snapshots[k]) { snapshots[k] = clone(sectionsFor(d)); saveSnapshots(); }
+  if (!checks[k]) checks[k] = {};
+  checks[k][id] = v;
+  saveChecks();
+}
 function getCheck(d, id) { return !!((checks[dk(d)] || {})[id]); }
 function hsl(r) { return `hsl(${Math.round(r * 120)}, 65%, 38%)`; }
 function wc(text) { return text.trim() === '' ? 0 : text.trim().split(/\s+/).length; }
+function mondayOf(d) { const m = new Date(d); m.setHours(0,0,0,0); const dow = m.getDay(); m.setDate(m.getDate() - (dow === 0 ? 6 : dow - 1)); return m; }
 
 let currentDay = new Date(); currentDay.setHours(0,0,0,0);
+let viewWeekMonday = mondayOf(new Date());
 let viewMonth = new Date(currentDay.getFullYear(), currentDay.getMonth(), 1);
 let viewYear = currentDay.getFullYear();
 let currentTab = 'today';
@@ -344,19 +395,44 @@ function switchTab(t) {
   document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
   document.getElementById('view-' + t).classList.add('active');
   ({today: renderToday, week: renderWeek, month: renderMonth, year: renderYear})[t]();
+  document.getElementById('scroll-area').scrollTop = 0;
+}
+
+/* Cross-view navigation */
+function goToDay(d) {
+  currentDay = new Date(d); currentDay.setHours(0,0,0,0);
+  dumpEditing = false; activePromptIdx = null;
+  switchTab('today');
+}
+function goToWeek(d) {
+  viewWeekMonday = mondayOf(d);
+  switchTab('week');
+}
+function goToMonth(year, month) {
+  viewMonth = new Date(year, month, 1);
+  switchTab('month');
+}
+
+function commitSectionsEdit(d) {
+  if (isPastDay(d)) {
+    saveSnapshots();
+  } else {
+    saveSections();
+    syncTodaySnapshot();
+  }
 }
 
 function renderToday() {
   const d = currentDay;
   const today = new Date(); today.setHours(0,0,0,0);
   const isToday = dk(d) === dk(today);
+  const daySections = sectionsFor(d);
   const sc = getDayRatio(d);
   const pct = sc.total ? Math.round(sc.ratio * 100) : 0;
   const color = sc.total ? hsl(sc.ratio) : '#aaa';
   const el = document.getElementById('view-today');
   el.innerHTML = '';
 
-  // Header
   const hdr = document.createElement('div');
   hdr.className = 'page-header';
   const title = document.createElement('div');
@@ -364,12 +440,23 @@ function renderToday() {
   title.textContent = isToday ? 'Today' : d.toLocaleDateString('en-GB', {weekday:'short', day:'numeric', month:'short'});
   const nav = document.createElement('div');
   nav.className = 'nav-arrows';
-  nav.innerHTML = `<div class="nav-arrow" onclick="changeDay(-1)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M15 18l-6-6 6-6"/></svg></div>
-    <div class="nav-arrow" onclick="changeDay(1)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M9 18l6-6-6-6"/></svg></div>`;
+  const prevBtn = document.createElement('div'); prevBtn.className = 'nav-arrow';
+  prevBtn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M15 18l-6-6 6-6"/></svg>';
+  prevBtn.onclick = () => changeDay(-1);
+  const nextBtn = document.createElement('div'); nextBtn.className = 'nav-arrow';
+  nextBtn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M9 18l6-6-6-6"/></svg>';
+  nextBtn.onclick = () => changeDay(1);
+  nav.appendChild(prevBtn); nav.appendChild(nextBtn);
   hdr.appendChild(title); hdr.appendChild(nav);
   el.appendChild(hdr);
 
-  // Stats
+  if (isPastDay(d)) {
+    const notice = document.createElement('div');
+    notice.className = 'past-notice';
+    notice.textContent = "You're viewing a past day. Its task list is frozen — edits here only affect this day.";
+    el.appendChild(notice);
+  }
+
   const stats = document.createElement('div');
   stats.className = 'stats-row';
   stats.innerHTML = `<div class="stat-card"><div class="stat-label">Done</div><div class="stat-val" style="color:${color}">${sc.done}</div></div>
@@ -377,16 +464,13 @@ function renderToday() {
     <div class="stat-card"><div class="stat-label">Score</div><div class="stat-val" style="color:${color}">${sc.total ? pct + '%' : '–'}</div></div>`;
   el.appendChild(stats);
 
-  // Progress bar
   const pb = document.createElement('div'); pb.className = 'pbar-wrap';
   pb.innerHTML = `<div class="pbar-fill" style="width:${pct}%;background:${color}"></div>`;
   el.appendChild(pb);
 
-  // Sections
-  sections.forEach(sec => {
+  daySections.forEach(sec => {
     const secEl = document.createElement('div'); secEl.className = 'section-block';
 
-    // Section header
     const secHdr = document.createElement('div');
     if (editingSection === sec.id) {
       secHdr.className = 'sec-rename-row';
@@ -396,7 +480,14 @@ function renderToday() {
       const sb = document.createElement('button'); sb.className = 'sec-save-btn'; sb.textContent = 'Save';
       sb.onclick = () => saveSectionName(sec, inp.value);
       const db = document.createElement('button'); db.className = 'sec-del-btn'; db.textContent = 'Delete';
-      db.onclick = () => { if (sections.length <= 1) return; sections = sections.filter(s => s.id !== sec.id); saveSections(); editingSection = null; renderToday(); };
+      db.onclick = () => {
+        const list = sectionsFor(currentDay);
+        if (list.length <= 1) return;
+        const idx = list.findIndex(s => s.id === sec.id);
+        if (idx > -1) list.splice(idx, 1);
+        commitSectionsEdit(currentDay);
+        editingSection = null; renderToday();
+      };
       secHdr.appendChild(inp); secHdr.appendChild(sb); secHdr.appendChild(db);
       setTimeout(() => inp.focus(), 0);
     } else {
@@ -404,7 +495,7 @@ function renderToday() {
       const lbl = document.createElement('div'); lbl.className = 'section-label'; lbl.textContent = sec.title;
       lbl.style.cursor = 'pointer'; lbl.onclick = () => { editingSection = sec.id; editingTask = null; renderToday(); };
       const ab = document.createElement('button'); ab.className = 'section-add-btn';
-      ab.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M12 5v14M5 12h14"/></svg>`;
+      ab.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M12 5v14M5 12h14"/></svg>';
       ab.onclick = () => { editingTask = {mode:'add', sectionId: sec.id}; editingSection = null; renderToday(); };
       secHdr.appendChild(lbl); secHdr.appendChild(ab);
     }
@@ -416,14 +507,34 @@ function renderToday() {
       }
       const done = getCheck(d, task.id);
       const row = document.createElement('div'); row.className = 'task-row' + (done ? ' done' : '');
-      row.innerHTML = `<div class="chk"><svg class="chk-inner" width="12" height="12" viewBox="0 0 12 12" fill="none"><polyline points="2,6 5,9 10,3" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
-        <div class="task-text"><div class="task-name">${task.name}</div>${task.time ? `<div class="task-time">${task.time}</div>` : ''}</div>
-        <div class="task-actions">
-          <button class="task-edit-btn" onclick="startEditTask('${task.id}','${sec.id}',event)" aria-label="Edit"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg></button>
-          <button class="task-del-btn" onclick="deleteTask('${task.id}','${sec.id}',event)" aria-label="Delete"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4h6v2"/></svg></button>
-        </div>`;
-      row.querySelector('.chk').onclick = e => { e.stopPropagation(); setCheck(d, task.id, !done); renderToday(); };
-      row.querySelector('.task-text').onclick = () => { setCheck(d, task.id, !done); renderToday(); };
+
+      const chk = document.createElement('div'); chk.className = 'chk';
+      chk.innerHTML = '<svg class="chk-inner" width="12" height="12" viewBox="0 0 12 12" fill="none"><polyline points="2,6 5,9 10,3" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+      chk.onclick = e => { e.stopPropagation(); setCheck(d, task.id, !done); renderToday(); };
+
+      const txt = document.createElement('div'); txt.className = 'task-text';
+      const nameEl = document.createElement('div'); nameEl.className = 'task-name'; nameEl.textContent = task.name;
+      txt.appendChild(nameEl);
+      if (task.time) { const timeEl = document.createElement('div'); timeEl.className = 'task-time'; timeEl.textContent = task.time; txt.appendChild(timeEl); }
+      txt.onclick = () => { setCheck(d, task.id, !done); renderToday(); };
+
+      const actions = document.createElement('div'); actions.className = 'task-actions';
+      const eb = document.createElement('button'); eb.className = 'task-edit-btn'; eb.setAttribute('aria-label','Edit');
+      eb.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>';
+      eb.onclick = e => { e.stopPropagation(); editingTask = {mode:'edit', taskId: task.id, sectionId: sec.id}; editingSection = null; renderToday(); };
+      const db2 = document.createElement('button'); db2.className = 'task-del-btn'; db2.setAttribute('aria-label','Delete');
+      db2.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4h6v2"/></svg>';
+      db2.onclick = e => {
+        e.stopPropagation();
+        const list = sectionsFor(currentDay);
+        const s2 = list.find(s => s.id === sec.id);
+        if (s2) s2.tasks = s2.tasks.filter(t => t.id !== task.id);
+        commitSectionsEdit(currentDay);
+        renderToday();
+      };
+      actions.appendChild(eb); actions.appendChild(db2);
+
+      row.appendChild(chk); row.appendChild(txt); row.appendChild(actions);
       secEl.appendChild(row);
     });
 
@@ -431,14 +542,13 @@ function renderToday() {
     el.appendChild(secEl);
   });
 
-  // Add section
   const addSec = document.createElement('div'); addSec.className = 'add-section-area';
   addSec.innerHTML = `<div class="add-section-label">Add section</div>
-    <div class="add-section-row"><input id="new-sec-inp" placeholder="Section name" /><button onclick="addSection()">Add</button></div>`;
+    <div class="add-section-row"><input id="new-sec-inp" placeholder="Section name" /><button id="add-sec-btn">Add</button></div>`;
   el.appendChild(addSec);
+  document.getElementById('add-sec-btn').onclick = addSection;
   document.getElementById('new-sec-inp').onkeydown = e => { if (e.key === 'Enter') addSection(); };
 
-  // Mind dump
   el.appendChild(buildMindDump(d));
 }
 
@@ -447,23 +557,30 @@ function buildMindDump(d) {
   const savedDump = dumps[dk(d)];
 
   const divEl = document.createElement('div'); divEl.className = 'divider';
-  divEl.innerHTML = `<div class="divider-line"></div><div class="divider-label">Mind dump</div><div class="divider-line"></div>`;
+  divEl.innerHTML = '<div class="divider-line"></div><div class="divider-label">Mind dump</div><div class="divider-line"></div>';
   wrap.appendChild(divEl);
 
   if (savedDump && !dumpEditing) {
     const card = document.createElement('div'); card.className = 'saved-dump-card';
-    card.innerHTML = `<div class="saved-dump-header"><span class="saved-dump-label">Written</span><span class="saved-dump-wc">${savedDump.wc} words</span></div>
-      ${savedDump.prompt ? `<div class="saved-dump-prompt">${savedDump.prompt}</div>` : ''}
-      <div class="saved-dump-text">${savedDump.text}</div>
-      <button class="saved-dump-edit" onclick="editDump()">Edit or rewrite</button>`;
+    const hdr = document.createElement('div'); hdr.className = 'saved-dump-header';
+    hdr.innerHTML = `<span class="saved-dump-label">Written</span><span class="saved-dump-wc">${savedDump.wc} words</span>`;
+    card.appendChild(hdr);
+    if (savedDump.prompt) { const pr = document.createElement('div'); pr.className = 'saved-dump-prompt'; pr.textContent = savedDump.prompt; card.appendChild(pr); }
+    const txt = document.createElement('div'); txt.className = 'saved-dump-text'; txt.textContent = savedDump.text;
+    card.appendChild(txt);
+    const editBtn = document.createElement('button'); editBtn.className = 'saved-dump-edit'; editBtn.textContent = 'Edit or rewrite';
+    editBtn.onclick = editDump;
+    card.appendChild(editBtn);
     wrap.appendChild(card);
     return wrap;
   }
 
-  // Prompts
   const ph = document.createElement('div'); ph.className = 'prompts-header';
-  ph.innerHTML = `<span class="prompts-sublabel">Pick a prompt — or just write</span>
-    <button class="shuffle-btn" onclick="doShuffle()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M16 3h5v5M4 20L21 3"/><path d="M21 16v5h-5"/><path d="M15 15l6 6"/><path d="M4 4l5 5"/></svg> Shuffle</button>`;
+  const sub = document.createElement('span'); sub.className = 'prompts-sublabel'; sub.textContent = 'Pick a prompt — or just write';
+  const shuf = document.createElement('button'); shuf.className = 'shuffle-btn';
+  shuf.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M16 3h5v5M4 20L21 3"/><path d="M21 16v5h-5"/><path d="M15 15l6 6"/><path d="M4 4l5 5"/></svg> Shuffle';
+  shuf.onclick = doShuffle;
+  ph.appendChild(sub); ph.appendChild(shuf);
   wrap.appendChild(ph);
 
   const pr = document.createElement('div'); pr.className = 'prompts-row';
@@ -479,11 +596,11 @@ function buildMindDump(d) {
   wrap.appendChild(pe);
 
   const lr = document.createElement('div'); lr.className = 'len-row';
-  lr.innerHTML = `<div class="len-badge" id="len-badge">Aim: 150–300 words</div><div class="len-hint" id="len-hint">A focused 5–10 min write.</div>`;
+  lr.innerHTML = '<div class="len-badge" id="len-badge">Aim: 150–300 words</div><div class="len-hint" id="len-hint">A focused 5–10 min write.</div>';
   wrap.appendChild(lr);
 
   const dpb = document.createElement('div'); dpb.className = 'dump-pbar-wrap';
-  dpb.innerHTML = `<div class="dump-pbar-fill" id="dump-pb-fill"></div>`;
+  dpb.innerHTML = '<div class="dump-pbar-fill" id="dump-pb-fill"></div>';
   wrap.appendChild(dpb);
 
   const ta = document.createElement('textarea'); ta.className = 'dump-textarea'; ta.id = 'dump-ta';
@@ -493,8 +610,12 @@ function buildMindDump(d) {
   wrap.appendChild(ta);
 
   const meta = document.createElement('div'); meta.className = 'dump-meta-row';
-  meta.innerHTML = `<div class="dump-wc">Words: <span id="dump-wc">0</span></div>
-    <div class="dump-btns"><button onclick="clearDump()">Clear</button><button class="dump-save-btn" onclick="saveDump()">Save</button></div>`;
+  const wcDiv = document.createElement('div'); wcDiv.className = 'dump-wc'; wcDiv.innerHTML = 'Words: <span id="dump-wc">0</span>';
+  const btns = document.createElement('div'); btns.className = 'dump-btns';
+  const clearBtn = document.createElement('button'); clearBtn.textContent = 'Clear'; clearBtn.onclick = clearDump;
+  const saveBtn = document.createElement('button'); saveBtn.className = 'dump-save-btn'; saveBtn.textContent = 'Save'; saveBtn.onclick = saveDump;
+  btns.appendChild(clearBtn); btns.appendChild(saveBtn);
+  meta.appendChild(wcDiv); meta.appendChild(btns);
   wrap.appendChild(meta);
 
   setTimeout(updateDumpMeta, 0);
@@ -513,10 +634,10 @@ function updateDumpMeta() {
   const pct = Math.min(100, Math.round(words / TARGET_HIGH * 100));
   fill.style.width = pct + '%';
   if (words === 0) { fill.style.background = '#ccc'; badge.className = 'len-badge'; badge.textContent = 'Aim: 150–300 words'; hint.textContent = 'A focused 5–10 min write.'; }
-  else if (words < TARGET_LOW) { fill.style.background = 'hsl(30,65%,42%)'; badge.className = 'len-badge warn'; badge.textContent = `${TARGET_LOW - words} words to go`; hint.textContent = 'Keep going — warming up.'; }
+  else if (words < TARGET_LOW) { fill.style.background = 'hsl(30,65%,42%)'; badge.className = 'len-badge warn'; badge.textContent = (TARGET_LOW - words) + ' words to go'; hint.textContent = 'Keep going — warming up.'; }
   else if (words <= TARGET_HIGH) { fill.style.background = 'hsl(100,65%,38%)'; badge.className = 'len-badge good'; badge.textContent = 'Sweet spot ✓'; hint.textContent = 'Wrap up when it feels complete.'; }
-  else if (words <= WARN_HIGH) { fill.style.background = 'hsl(45,65%,38%)'; badge.className = 'len-badge warn'; badge.textContent = `${words} words — going long`; hint.textContent = 'Consider wrapping up.'; }
-  else { fill.style.background = 'hsl(0,65%,38%)'; badge.className = 'len-badge over'; badge.textContent = `${words} words — time to stop`; hint.textContent = 'Save it and let it go.'; }
+  else if (words <= WARN_HIGH) { fill.style.background = 'hsl(45,65%,38%)'; badge.className = 'len-badge warn'; badge.textContent = words + ' words — going long'; hint.textContent = 'Consider wrapping up.'; }
+  else { fill.style.background = 'hsl(0,65%,38%)'; badge.className = 'len-badge over'; badge.textContent = words + ' words — time to stop'; hint.textContent = 'Save it and let it go.'; }
 }
 
 function selectPrompt(i) {
@@ -548,9 +669,18 @@ function buildEditRow(task, secId, mode) {
   const sb = document.createElement('button'); sb.textContent = 'Save'; sb.className = 'save-btn';
   sb.onclick = () => {
     const name = ni.value.trim(); if (!name) return;
-    if (mode === 'add') { const sec = sections.find(s => s.id === secId); if (sec) sec.tasks.push({id: gid(), name, time: ti.value.trim()}); }
-    else { for (const sec of sections) { const t = sec.tasks.find(t => t.id === task.id); if (t) { t.name = name; t.time = ti.value.trim(); break; } } }
-    saveSections(); editingTask = null; renderToday();
+    const list = sectionsFor(currentDay);
+    if (mode === 'add') {
+      const sec = list.find(s => s.id === secId);
+      if (sec) sec.tasks.push({id: gid(), name, time: ti.value.trim()});
+    } else {
+      for (const sec of list) {
+        const t = sec.tasks.find(t => t.id === task.id);
+        if (t) { t.name = name; t.time = ti.value.trim(); break; }
+      }
+    }
+    commitSectionsEdit(currentDay);
+    editingTask = null; renderToday();
   };
   btns.appendChild(cb); btns.appendChild(sb);
   wrap.appendChild(ni); wrap.appendChild(ti); wrap.appendChild(btns);
@@ -560,29 +690,60 @@ function buildEditRow(task, secId, mode) {
   return wrap;
 }
 
-function saveSectionName(sec, val) { sec.title = val.trim() || sec.title; saveSections(); editingSection = null; renderToday(); }
-function startEditTask(id, secId, e) { e.stopPropagation(); editingTask = {mode:'edit', taskId: id, sectionId: secId}; editingSection = null; renderToday(); }
-function deleteTask(id, secId, e) { e.stopPropagation(); const sec = sections.find(s => s.id === secId); if (sec) sec.tasks = sec.tasks.filter(t => t.id !== id); saveSections(); renderToday(); }
-function addSection() { const inp = document.getElementById('new-sec-inp'); const t = inp.value.trim(); if (!t) return; sections.push({id: gid(), title: t, tasks: []}); saveSections(); inp.value = ''; renderToday(); }
-function changeDay(n) { currentDay = new Date(currentDay); currentDay.setDate(currentDay.getDate() + n); dumpEditing = false; activePromptIdx = null; renderToday(); }
+function saveSectionName(sec, val) {
+  sec.title = val.trim() || sec.title;
+  commitSectionsEdit(currentDay);
+  editingSection = null; renderToday();
+}
+function addSection() {
+  const inp = document.getElementById('new-sec-inp'); const t = inp.value.trim(); if (!t) return;
+  const list = sectionsFor(currentDay);
+  list.push({id: gid(), title: t, tasks: []});
+  commitSectionsEdit(currentDay);
+  inp.value = ''; renderToday();
+}
+function changeDay(n) { currentDay = new Date(currentDay); currentDay.setDate(currentDay.getDate() + n); dumpEditing = false; activePromptIdx = null; editingTask = null; editingSection = null; renderToday(); }
 
+/* ---------- WEEK VIEW (navigable + tappable days) ---------- */
 function renderWeek() {
   const today = new Date(); today.setHours(0,0,0,0);
-  const dow = today.getDay(); const monday = new Date(today); monday.setDate(today.getDate() - (dow === 0 ? 6 : dow - 1));
+  const monday = new Date(viewWeekMonday);
   const dayNames = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
   const days = Array.from({length:7}, (_,i) => { const d = new Date(monday); d.setDate(monday.getDate() + i); return d; });
+  const sunday = days[6];
+
   let td = 0, tt = 0, dt = 0;
   days.forEach(d => { if (hasData(d)) { const r = getDayRatio(d); td += r.done; tt += r.total; dt++; } });
   const wr = tt > 0 ? td / tt : 0;
   const wColor = dt ? hsl(wr) : '#aaa';
   const el = document.getElementById('view-week');
+  el.innerHTML = '';
 
-  let html = `<div class="page-header"><div class="page-title">This week</div></div>
-    <div class="stats-row">
-      <div class="stat-card"><div class="stat-label">Average</div><div class="stat-val" style="color:${wColor}">${dt ? Math.round(wr*100)+'%' : '–'}</div></div>
-      <div class="stat-card"><div class="stat-label">Days done</div><div class="stat-val">${dt} / 7</div></div>
-      <div class="stat-card"><div class="stat-label">Dumps</div><div class="stat-val">${days.filter(d => dumps[dk(d)]).length} / 7</div></div>
-    </div>`;
+  const isCurrentWeek = dk(monday) === dk(mondayOf(today));
+  const rangeLabel = isCurrentWeek ? 'This week'
+    : monday.toLocaleDateString('en-GB',{day:'numeric',month:'short'}) + ' – ' + sunday.toLocaleDateString('en-GB',{day:'numeric',month:'short'});
+
+  const hdr = document.createElement('div'); hdr.className = 'page-header';
+  const title = document.createElement('div'); title.className = 'page-title' + (isCurrentWeek ? '' : ' sub'); title.textContent = rangeLabel;
+  const nav = document.createElement('div'); nav.className = 'nav-arrows';
+  const pb2 = document.createElement('div'); pb2.className = 'nav-arrow';
+  pb2.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M15 18l-6-6 6-6"/></svg>';
+  pb2.onclick = () => { viewWeekMonday.setDate(viewWeekMonday.getDate() - 7); renderWeek(); };
+  const nb2 = document.createElement('div'); nb2.className = 'nav-arrow';
+  nb2.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M9 18l6-6-6-6"/></svg>';
+  nb2.onclick = () => { viewWeekMonday.setDate(viewWeekMonday.getDate() + 7); renderWeek(); };
+  nav.appendChild(pb2); nav.appendChild(nb2);
+  hdr.appendChild(title); hdr.appendChild(nav);
+  el.appendChild(hdr);
+
+  const hint = document.createElement('div'); hint.className = 'tap-hint'; hint.textContent = 'Tap a day to open it';
+  el.appendChild(hint);
+
+  const stats = document.createElement('div'); stats.className = 'stats-row';
+  stats.innerHTML = `<div class="stat-card"><div class="stat-label">Average</div><div class="stat-val" style="color:${wColor}">${dt ? Math.round(wr*100)+'%' : '–'}</div></div>
+    <div class="stat-card"><div class="stat-label">Days done</div><div class="stat-val">${dt} / 7</div></div>
+    <div class="stat-card"><div class="stat-label">Dumps</div><div class="stat-val">${days.filter(d => dumps[dk(d)]).length} / 7</div></div>`;
+  el.appendChild(stats);
 
   days.forEach((d, i) => {
     const isToday = dk(d) === dk(today);
@@ -592,20 +753,37 @@ function renderWeek() {
     const pct = Math.round(r.ratio * 100);
     const color = hasDat && !isFuture ? hsl(r.ratio) : null;
     const hasDump = !!dumps[dk(d)];
-    html += `<div class="week-bar-row">
-      <div class="week-day-label" style="font-weight:${isToday?'600':'400'}">${dayNames[i]} ${d.getDate()}</div>
-      <div class="week-bar-track">
-        ${color ? `<div class="week-bar-fill" style="width:${pct}%;background:${color}"><span class="week-bar-pct">${pct}%</span></div>` : ''}
-      </div>
-      <div class="week-dump-dot" style="color:${hasDump?'#4a8a1a':'var(--border-strong)'}">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 013 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
-      </div>
-      <div class="week-task-count">${hasDat && !isFuture ? r.done+'/'+r.total : '–'}</div>
-    </div>`;
+    const dCopy = new Date(d);
+
+    const row = document.createElement('div'); row.className = 'week-bar-row';
+    row.onclick = () => goToDay(dCopy);
+
+    const lbl = document.createElement('div'); lbl.className = 'week-day-label';
+    lbl.style.fontWeight = isToday ? '600' : '400';
+    lbl.textContent = dayNames[i] + ' ' + d.getDate();
+
+    const track = document.createElement('div'); track.className = 'week-bar-track';
+    if (color) {
+      const fill = document.createElement('div'); fill.className = 'week-bar-fill';
+      fill.style.width = pct + '%'; fill.style.background = color;
+      const pctSpan = document.createElement('span'); pctSpan.className = 'week-bar-pct'; pctSpan.textContent = pct + '%';
+      fill.appendChild(pctSpan);
+      track.appendChild(fill);
+    }
+
+    const dot = document.createElement('div'); dot.className = 'week-dump-dot';
+    dot.style.color = hasDump ? '#4a8a1a' : 'var(--border-strong)';
+    dot.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 013 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>';
+
+    const cnt = document.createElement('div'); cnt.className = 'week-task-count';
+    cnt.textContent = hasDat && !isFuture ? r.done + '/' + r.total : '–';
+
+    row.appendChild(lbl); row.appendChild(track); row.appendChild(dot); row.appendChild(cnt);
+    el.appendChild(row);
   });
-  el.innerHTML = html;
 }
 
+/* ---------- MONTH VIEW (tappable days -> week) ---------- */
 function renderMonth() {
   const today = new Date(); today.setHours(0,0,0,0);
   const year = viewMonth.getFullYear(), month = viewMonth.getMonth();
@@ -614,24 +792,40 @@ function renderMonth() {
   for (let i = 1; i <= lastDay; i++) { const d = new Date(year, month, i); if (hasData(d) && d <= today) { const r = getDayRatio(d); sumR += r.ratio; cnt++; if (r.ratio > bestR) { bestR = r.ratio; bestD = i; } } }
   const avg = cnt ? sumR / cnt : 0;
   const el = document.getElementById('view-month');
+  el.innerHTML = '';
 
-  let html = `<div class="page-header">
-    <div class="page-title">${viewMonth.toLocaleDateString('en-GB',{month:'long'})}</div>
-    <div class="nav-arrows">
-      <div class="nav-arrow" onclick="chMonth(-1)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 18l-6-6 6-6"/></svg></div>
-      <div class="nav-arrow" onclick="chMonth(1)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 18l6-6-6-6"/></svg></div>
-    </div>
-  </div>
-  <div class="stats-row">
-    <div class="stat-card"><div class="stat-label">Average</div><div class="stat-val" style="color:${cnt?hsl(avg):'#aaa'}">${cnt?Math.round(avg*100)+'%':'–'}</div></div>
+  const hdr = document.createElement('div'); hdr.className = 'page-header';
+  const title = document.createElement('div'); title.className = 'page-title';
+  const opts = year !== today.getFullYear() ? {month:'long', year:'numeric'} : {month:'long'};
+  title.textContent = viewMonth.toLocaleDateString('en-GB', opts);
+  const nav = document.createElement('div'); nav.className = 'nav-arrows';
+  const pb2 = document.createElement('div'); pb2.className = 'nav-arrow';
+  pb2.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 18l-6-6 6-6"/></svg>';
+  pb2.onclick = () => { viewMonth = new Date(viewMonth.getFullYear(), viewMonth.getMonth()-1, 1); renderMonth(); };
+  const nb2 = document.createElement('div'); nb2.className = 'nav-arrow';
+  nb2.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 18l6-6-6-6"/></svg>';
+  nb2.onclick = () => { viewMonth = new Date(viewMonth.getFullYear(), viewMonth.getMonth()+1, 1); renderMonth(); };
+  nav.appendChild(pb2); nav.appendChild(nb2);
+  hdr.appendChild(title); hdr.appendChild(nav);
+  el.appendChild(hdr);
+
+  const hint = document.createElement('div'); hint.className = 'tap-hint'; hint.textContent = 'Tap a day to open its week';
+  el.appendChild(hint);
+
+  const stats = document.createElement('div'); stats.className = 'stats-row';
+  stats.innerHTML = `<div class="stat-card"><div class="stat-label">Average</div><div class="stat-val" style="color:${cnt?hsl(avg):'#aaa'}">${cnt?Math.round(avg*100)+'%':'–'}</div></div>
     <div class="stat-card"><div class="stat-label">Tracked</div><div class="stat-val">${cnt} / ${lastDay}</div></div>
-    <div class="stat-card"><div class="stat-label">Best day</div><div class="stat-val">${bestD ? bestD+'—'+Math.round(bestR*100)+'%' : '–'}</div></div>
-  </div>
-  <div class="month-grid-header">${['M','T','W','T','F','S','S'].map(d=>`<span>${d}</span>`).join('')}</div>
-  <div class="month-grid">`;
+    <div class="stat-card"><div class="stat-label">Best day</div><div class="stat-val">${bestD ? bestD+'—'+Math.round(bestR*100)+'%' : '–'}</div></div>`;
+  el.appendChild(stats);
 
+  const gridHdr = document.createElement('div'); gridHdr.className = 'month-grid-header';
+  ['M','T','W','T','F','S','S'].forEach(dn => { const s = document.createElement('span'); s.textContent = dn; gridHdr.appendChild(s); });
+  el.appendChild(gridHdr);
+
+  const grid = document.createElement('div'); grid.className = 'month-grid';
   let firstDow = new Date(year, month, 1).getDay(); if (firstDow === 0) firstDow = 7;
-  for (let i = 1; i < firstDow; i++) html += `<div class="mcell empty"></div>`;
+  for (let i = 1; i < firstDow; i++) { const c = document.createElement('div'); c.className = 'mcell empty'; grid.appendChild(c); }
+
   for (let day = 1; day <= lastDay; day++) {
     const d = new Date(year, month, day);
     const isToday = dk(d) === dk(today);
@@ -640,50 +834,86 @@ function renderMonth() {
     const r = getDayRatio(d);
     const hasDump = !!dumps[dk(d)];
     const color = hasDat && !isFuture ? hsl(r.ratio) : null;
-    html += `<div class="mcell${hasDat&&!isFuture?'':' no-data'}${isToday?' today':''}" style="${color?`background:${color};border-color:${color}`:''}" title="${hasDat&&!isFuture?Math.round(r.ratio*100)+'%':''}">
-      ${day}${hasDump && color ? '<div class="mcell-dot"></div>' : ''}
-    </div>`;
-  }
-  html += `</div>`;
-  el.innerHTML = html;
-}
-function chMonth(n) { viewMonth = new Date(viewMonth.getFullYear(), viewMonth.getMonth()+n, 1); renderMonth(); }
+    const dCopy = new Date(d);
 
+    const cell = document.createElement('div');
+    cell.className = 'mcell' + (hasDat && !isFuture ? '' : ' no-data') + (isToday ? ' today' : '');
+    if (color) { cell.style.background = color; cell.style.borderColor = color; }
+    if (hasDat && !isFuture) cell.title = Math.round(r.ratio*100) + '%';
+    cell.onclick = () => goToWeek(dCopy);
+
+    const numSpan = document.createElement('span'); numSpan.textContent = day;
+    cell.appendChild(numSpan);
+    if (hasDump && color) { const dot = document.createElement('div'); dot.className = 'mcell-dot'; cell.appendChild(dot); }
+    grid.appendChild(cell);
+  }
+  el.appendChild(grid);
+}
+
+/* ---------- YEAR VIEW (tappable months) ---------- */
 function renderYear() {
   const today = new Date(); today.setHours(0,0,0,0);
   const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
   let yearSum = 0, trackedM = 0, totalDays = 0;
-  let cardsHtml = '';
+  const el = document.getElementById('view-year');
+  el.innerHTML = '';
+
+  const hdr = document.createElement('div'); hdr.className = 'page-header';
+  const title = document.createElement('div'); title.className = 'page-title'; title.textContent = viewYear;
+  const nav = document.createElement('div'); nav.className = 'nav-arrows';
+  const pb2 = document.createElement('div'); pb2.className = 'nav-arrow';
+  pb2.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 18l-6-6 6-6"/></svg>';
+  pb2.onclick = () => { viewYear--; renderYear(); };
+  const nb2 = document.createElement('div'); nb2.className = 'nav-arrow';
+  nb2.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 18l6-6-6-6"/></svg>';
+  nb2.onclick = () => { viewYear++; renderYear(); };
+  nav.appendChild(pb2); nav.appendChild(nb2);
+  hdr.appendChild(title); hdr.appendChild(nav);
+  el.appendChild(hdr);
+
+  const hint = document.createElement('div'); hint.className = 'tap-hint'; hint.textContent = 'Tap a month to open it';
+  el.appendChild(hint);
+
+  const grid = document.createElement('div'); grid.className = 'year-grid';
+  const monthData = [];
   for (let m = 0; m < 12; m++) {
     const last = new Date(viewYear, m+1, 0).getDate();
     let s = 0, c = 0;
     for (let day = 1; day <= last; day++) { const d = new Date(viewYear, m, day); if (d <= today && hasData(d)) { s += getDayRatio(d).ratio; c++; totalDays++; } }
     const avg = c ? s / c : null;
     if (avg !== null) { yearSum += avg; trackedM++; }
-    const color = avg !== null ? hsl(avg) : null;
-    cardsHtml += `<div class="yr-card">
-      <div class="yr-name">${months[m]}</div>
-      <div class="yr-bar-track"><div class="yr-bar-fill" style="${color?`width:100%;background:${color}`:'width:0%'}"></div></div>
-      <div class="yr-pct" style="${color?`color:${color}`:'color:var(--text-3)'}">${avg !== null ? Math.round(avg*100)+'%' : '–'}</div>
-    </div>`;
+    monthData.push(avg);
   }
+
+  for (let m = 0; m < 12; m++) {
+    const avg = monthData[m];
+    const color = avg !== null ? hsl(avg) : null;
+    const mIdx = m;
+
+    const card = document.createElement('div'); card.className = 'yr-card';
+    card.onclick = () => goToMonth(viewYear, mIdx);
+
+    const nm = document.createElement('div'); nm.className = 'yr-name'; nm.textContent = months[m];
+    const track = document.createElement('div'); track.className = 'yr-bar-track';
+    const fill = document.createElement('div'); fill.className = 'yr-bar-fill';
+    if (color) { fill.style.width = '100%'; fill.style.background = color; } else { fill.style.width = '0%'; }
+    track.appendChild(fill);
+    const pctEl = document.createElement('div'); pctEl.className = 'yr-pct';
+    pctEl.style.color = color || 'var(--text-3)';
+    pctEl.textContent = avg !== null ? Math.round(avg*100) + '%' : '–';
+
+    card.appendChild(nm); card.appendChild(track); card.appendChild(pctEl);
+    grid.appendChild(card);
+  }
+
   const ya = trackedM ? Math.round((yearSum / trackedM) * 100) : null;
-  const el = document.getElementById('view-year');
-  el.innerHTML = `<div class="page-header">
-    <div class="page-title">${viewYear}</div>
-    <div class="nav-arrows">
-      <div class="nav-arrow" onclick="chYear(-1)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 18l-6-6 6-6"/></svg></div>
-      <div class="nav-arrow" onclick="chYear(1)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 18l6-6-6-6"/></svg></div>
-    </div>
-  </div>
-  <div class="stats-row">
-    <div class="stat-card"><div class="stat-label">Year avg</div><div class="stat-val" style="color:${ya?hsl(ya/100):'#aaa'}">${ya?ya+'%':'–'}</div></div>
+  const stats = document.createElement('div'); stats.className = 'stats-row';
+  stats.innerHTML = `<div class="stat-card"><div class="stat-label">Year avg</div><div class="stat-val" style="color:${ya?hsl(ya/100):'#aaa'}">${ya?ya+'%':'–'}</div></div>
     <div class="stat-card"><div class="stat-label">Months</div><div class="stat-val">${trackedM} / 12</div></div>
-    <div class="stat-card"><div class="stat-label">Days logged</div><div class="stat-val">${totalDays}</div></div>
-  </div>
-  <div class="year-grid">${cardsHtml}</div>`;
+    <div class="stat-card"><div class="stat-label">Days logged</div><div class="stat-val">${totalDays}</div></div>`;
+  el.appendChild(stats);
+  el.appendChild(grid);
 }
-function chYear(n) { viewYear += n; renderYear(); }
 
 renderToday();
 </script>
